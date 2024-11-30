@@ -1,0 +1,24 @@
+{
+  "name": "solophp/logger",
+  "type": "library",
+  "description": "PSR-3 compatible logger implementation",
+  "keywords": ["php","logger","psr-3"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Vitaliy Olos",
+      "email": "vedastudio@gmail.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "Solo\\": "Solo/"
+    }
+  },
+  "require": {
+    "php": ">=7.4",
+    "psr/log": "^3.0"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
