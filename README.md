@@ -52,6 +52,7 @@ $logger->setTimezone('Asia/Tokyo');
 - Support for all PSR-3 log levels
 - **Log rotation** with size and time-based strategies
 - **Automatic cleanup** of old log files
+- **Minimal level filtering** via `setMinLevel()`
 - **Thread-safe** rotation operations
 - **Modular architecture** with clear separation of concerns
 
@@ -111,6 +112,8 @@ $logger->setMaxFileSize(1024 * 1024); // 1MB
 $logger->setMaxFiles(10);
 $logger->setRotationStrategy('both');
 $logger->setRotationInterval(3600); // 1 hour
+// Record WARNING and higher only
+$logger->setMinLevel(LogLevel::WARNING);
 ```
 
 ### File Naming

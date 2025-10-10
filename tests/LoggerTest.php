@@ -61,6 +61,25 @@ class LoggerTest extends TestCase
         $this->assertStringContainsString('DEBUG: Debug message', $content);
     }
 
+    public function testMinLevelFiltering(): void
+    {
+        $logger = new Logger($this->testLogFile);
+
+        // Only WARNING and above should be written
+        $logger->setMinLevel(LogLevel::WARNING);
+
+        $logger->debug('Should be ignored');
+        $logger->info('Should be ignored');
+        $logger->warning('Should appear');
+        $logger->error('Should appear');
+
+        $content = file_get_contents($this->testLogFile);
+        $this->assertStringNotContainsString('DEBUG: Should be ignored', $content);
+        $this->assertStringNotContainsString('INFO: Should be ignored', $content);
+        $this->assertStringContainsString('WARNING: Should appear', $content);
+        $this->assertStringContainsString('ERROR: Should appear', $content);
+    }
+
     public function testContextInterpolation(): void
     {
         $logger = new Logger($this->testLogFile);

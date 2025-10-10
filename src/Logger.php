@@ -17,6 +17,24 @@ class Logger implements LoggerInterface
     private FileSystemManager $fileSystem;
     private ContextInterpolator $interpolator;
     private LogRotator $rotator;
+    /**
+     * Minimal log level that will be recorded. Levels below this threshold will be ignored.
+     */
+    private string $minLevel = LogLevel::DEBUG;
+
+    /**
+     * Severity ranking for PSR-3 levels (lower value = higher severity)
+     */
+    private const LEVEL_ORDER = [
+        LogLevel::EMERGENCY => 0,
+        LogLevel::ALERT => 1,
+        LogLevel::CRITICAL => 2,
+        LogLevel::ERROR => 3,
+        LogLevel::WARNING => 4,
+        LogLevel::NOTICE => 5,
+        LogLevel::INFO => 6,
+        LogLevel::DEBUG => 7,
+    ];
 
     /**
      * @param string $logFile Path to log file
@@ -71,6 +89,29 @@ class Logger implements LoggerInterface
         $this->rotator->setRotationInterval($rotationInterval);
     }
 
+    /**
+     * Set minimal log level threshold.
+     * Messages with lower severity will be ignored.
+     */
+    public function setMinLevel(string $level): void
+    {
+        if (!isset(self::LEVEL_ORDER[$level])) {
+            throw new \InvalidArgumentException(sprintf('Invalid log level "%s"', $level));
+        }
+
+        $this->minLevel = $level;
+    }
+
+    private function isLevelAllowed(string $level): bool
+    {
+        // If unknown level, allow it to pass to maintain backward compatibility
+        if (!isset(self::LEVEL_ORDER[$level])) {
+            return true;
+        }
+
+        return self::LEVEL_ORDER[$level] <= self::LEVEL_ORDER[$this->minLevel];
+    }
+
     public function emergency(string|\Stringable $message, array $context = []): void
     {
         $this->log(LogLevel::EMERGENCY, $message, $context);
@@ -121,6 +162,11 @@ class Logger implements LoggerInterface
 
         $this->fileSystem->ensureLogDirectory($logFile);
         $this->rotator->checkAndRotate($logFile);
+
+        // Filter by minimal level
+        if (!$this->isLevelAllowed($level)) {
+            return;
+        }
 
         $timestamp = date('Y-m-d H:i:s');
         $interpolatedMessage = $this->interpolator->interpolate($message, $context);
