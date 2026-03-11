@@ -34,7 +34,7 @@ class LoggerTest extends TestCase
 
         $this->assertFileExists($this->testLogFile);
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('INFO: Test message', $content);
+        $this->assertStringContainsString('Test message', $content);
     }
 
     public function testAllLogLevels(): void
@@ -51,14 +51,14 @@ class LoggerTest extends TestCase
         $logger->debug('Debug message');
 
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('EMERGENCY: Emergency message', $content);
-        $this->assertStringContainsString('ALERT: Alert message', $content);
-        $this->assertStringContainsString('CRITICAL: Critical message', $content);
-        $this->assertStringContainsString('ERROR: Error message', $content);
-        $this->assertStringContainsString('WARNING: Warning message', $content);
-        $this->assertStringContainsString('NOTICE: Notice message', $content);
-        $this->assertStringContainsString('INFO: Info message', $content);
-        $this->assertStringContainsString('DEBUG: Debug message', $content);
+        $this->assertStringContainsString('Emergency message', $content);
+        $this->assertStringContainsString('Alert message', $content);
+        $this->assertStringContainsString('Critical message', $content);
+        $this->assertStringContainsString('Error message', $content);
+        $this->assertStringContainsString('Warning message', $content);
+        $this->assertStringContainsString('Notice message', $content);
+        $this->assertStringContainsString('Info message', $content);
+        $this->assertStringContainsString('Debug message', $content);
     }
 
     public function testMinLevelFiltering(): void
@@ -74,10 +74,8 @@ class LoggerTest extends TestCase
         $logger->error('Should appear');
 
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringNotContainsString('DEBUG: Should be ignored', $content);
-        $this->assertStringNotContainsString('INFO: Should be ignored', $content);
-        $this->assertStringContainsString('WARNING: Should appear', $content);
-        $this->assertStringContainsString('ERROR: Should appear', $content);
+        $this->assertStringNotContainsString('Should be ignored', $content);
+        $this->assertStringContainsString('Should appear', $content);
     }
 
     public function testContextInterpolation(): void
@@ -89,7 +87,7 @@ class LoggerTest extends TestCase
         ]);
 
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('INFO: User 123 performed login', $content);
+        $this->assertStringContainsString('User 123 performed login', $content);
     }
 
     public function testStringableObject(): void
@@ -106,7 +104,7 @@ class LoggerTest extends TestCase
         $logger->info($stringableObject);
 
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('INFO: Stringable message', $content);
+        $this->assertStringContainsString('Stringable message', $content);
     }
 
     public function testLogMethod(): void
@@ -115,7 +113,7 @@ class LoggerTest extends TestCase
         $logger->log(LogLevel::INFO, 'Direct log message');
 
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('INFO: Direct log message', $content);
+        $this->assertStringContainsString('Direct log message', $content);
     }
 
     public function testEmptyLogFile(): void
@@ -141,6 +139,39 @@ class LoggerTest extends TestCase
 
         $this->assertFileExists($this->testLogFile);
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('INFO: Configuration test', $content);
+        $this->assertStringContainsString('Configuration test', $content);
+    }
+
+    public function testSetMinLevelWithInvalidLevel(): void
+    {
+        $logger = new Logger($this->testLogFile);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $logger->setMinLevel('invalid_level');
+    }
+
+    public function testUnknownLevelIsAllowed(): void
+    {
+        $logger = new Logger($this->testLogFile);
+        $logger->log('custom_level', 'Custom level message');
+
+        $content = file_get_contents($this->testLogFile);
+        $this->assertStringContainsString('Custom level message', $content);
+    }
+
+    public function testLogCreatesDirectory(): void
+    {
+        $dir = sys_get_temp_dir() . '/logger_newdir_' . uniqid();
+        $logFile = $dir . '/test.log';
+
+        $logger = new Logger($logFile);
+        $logger->info('Directory creation test');
+
+        $this->assertFileExists($logFile);
+        $content = file_get_contents($logFile);
+        $this->assertStringContainsString('Directory creation test', $content);
+
+        unlink($logFile);
+        rmdir($dir);
     }
 }

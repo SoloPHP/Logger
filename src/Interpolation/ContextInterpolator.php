@@ -9,6 +9,9 @@ class ContextInterpolator
     /**
      * Interpolate context values into message placeholders
      */
+    /**
+     * @param array<string, mixed> $context
+     */
     public function interpolate(string|\Stringable $message, array $context = []): string
     {
         $replace = [];

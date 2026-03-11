@@ -38,7 +38,7 @@ class Logger implements LoggerInterface
 
     /**
      * @param string $logFile Path to log file
-     * @param string $timezone Timezone for log timestamps
+     * @param string $timezone Timezone for rotation file timestamps
      * @param int $maxFileSize Maximum file size in bytes (0 = no limit)
      * @param int $maxFiles Maximum number of rotation files (0 = no limit)
      * @param string $rotationStrategy Rotation strategy: 'size', 'time', 'both'
@@ -168,16 +168,9 @@ class Logger implements LoggerInterface
             return;
         }
 
-        $timestamp = date('Y-m-d H:i:s');
         $interpolatedMessage = $this->interpolator->interpolate($message, $context);
 
-        $logLine = sprintf(
-            '[%s] %s: %s%s',
-            $timestamp,
-            strtoupper($level),
-            $interpolatedMessage,
-            PHP_EOL
-        );
+        $logLine = $interpolatedMessage . PHP_EOL;
 
         $this->fileSystem->writeLogLine($logFile, $logLine);
     }

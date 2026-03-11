@@ -162,10 +162,10 @@ $logger = new Logger(
 
 ## Output Format
 
-Logs are written in the following format:
+Logs are written as plain interpolated messages, one per line:
 ```text
-[2024-01-30 15:30:45] INFO: Your message here
-[2024-01-30 15:30:46] ERROR: Error message with context: {context_value}
+Your message here
+Error message with context: context_value
 ```
 
 ## Development

@@ -91,4 +91,27 @@ class LogRotatorTest extends TestCase
         // Test that methods don't throw errors
         $this->assertTrue(true);
     }
+
+    public function testOldFilesCleanup(): void
+    {
+        $rotator = new LogRotator(100, 2, 'size');
+
+        // Create existing rotated files to exceed maxFiles
+        file_put_contents($this->testLogDir . '/test_2020-01-01_00-00-01.log', 'old1');
+        sleep(1);
+        file_put_contents($this->testLogDir . '/test_2020-01-01_00-00-02.log', 'old2');
+        sleep(1);
+
+        // Create current log file exceeding size limit
+        file_put_contents($this->testLogFile, str_repeat('x', 150));
+
+        $rotator->checkAndRotate($this->testLogFile);
+
+        // Original file should be rotated
+        $this->assertFileDoesNotExist($this->testLogFile);
+
+        // Oldest file should be deleted to stay within maxFiles limit
+        $remainingFiles = glob($this->testLogDir . '/test_*.log');
+        $this->assertLessThanOrEqual(2, count($remainingFiles));
+    }
 }

@@ -107,11 +107,11 @@ class LogRotator
     private function cleanOldLogFiles(string $logDir, string $logBase, string $logExt): void
     {
         $pattern = $logDir . '/' . $logBase . '_*.' . $logExt;
-        $files = glob($pattern);
+        $files = glob($pattern) ?: [];
 
         if (count($files) >= $this->maxFiles) {
             // Sort files by modification time (oldest first)
-            usort($files, fn($a, $b) => filemtime($a) - filemtime($b));
+            usort($files, fn(string $a, string $b) => filemtime($a) - filemtime($b));
 
             // Remove oldest files
             $filesToDelete = array_slice($files, 0, count($files) - $this->maxFiles + 1);

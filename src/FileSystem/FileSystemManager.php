@@ -27,20 +27,4 @@ class FileSystemManager
             FILE_APPEND | LOCK_EX
         );
     }
-
-    /**
-     * Check if file exists
-     */
-    public function fileExists(string $file): bool
-    {
-        return file_exists($file);
-    }
-
-    /**
-     * Get file size
-     */
-    public function getFileSize(string $file): int
-    {
-        return filesize($file);
-    }
 }
