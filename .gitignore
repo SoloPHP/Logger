@@ -18,6 +18,9 @@ Thumbs.db
 .phpunit.cache/
 .phpunit.result.cache
 
+# Static analysis
+.phpstan/
+
 # Logs
 *.log
 /logs/
