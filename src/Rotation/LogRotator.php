@@ -11,18 +11,21 @@ class LogRotator
     private string $rotationStrategy;
     private int $rotationInterval;
     private int $lastRotationTime;
+    private \DateTimeZone $timezone;
 
     public function __construct(
         int $maxFileSize = 0,
         int $maxFiles = 0,
         string $rotationStrategy = 'size',
-        int $rotationInterval = 86400
+        int $rotationInterval = 86400,
+        string $timezone = ''
     ) {
         $this->maxFileSize = $maxFileSize;
         $this->maxFiles = $maxFiles;
         $this->rotationStrategy = $rotationStrategy;
         $this->rotationInterval = $rotationInterval;
         $this->lastRotationTime = time();
+        $this->timezone = new \DateTimeZone($timezone ?: date_default_timezone_get());
     }
 
     public function setMaxFileSize(int $maxFileSize): void
@@ -43,6 +46,11 @@ class LogRotator
     public function setRotationInterval(int $rotationInterval): void
     {
         $this->rotationInterval = $rotationInterval;
+    }
+
+    public function setTimezone(string $timezone): void
+    {
+        $this->timezone = new \DateTimeZone($timezone ?: date_default_timezone_get());
     }
 
     /**
@@ -91,7 +99,8 @@ class LogRotator
         }
 
         // Rename current file
-        $timestamp = date('Y-m-d_H-i-s');
+        $now = new \DateTimeImmutable('now', $this->timezone);
+        $timestamp = $now->format('Y-m-d_H-i-s');
         $rotatedFile = $logDir . '/' . $logBase . '_' . $timestamp . '.' . $logExt;
 
         if (file_exists($logFile)) {

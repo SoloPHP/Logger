@@ -92,6 +92,37 @@ class LogRotatorTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testConstructorTimezone(): void
+    {
+        $rotator = new LogRotator(100, 3, 'size', 86400, 'Pacific/Auckland');
+
+        file_put_contents($this->testLogFile, str_repeat('x', 150));
+
+        $expected = (new \DateTimeImmutable('now', new \DateTimeZone('Pacific/Auckland')))->format('Y-m-d_H-i');
+
+        $rotator->checkAndRotate($this->testLogFile);
+
+        $files = glob($this->testLogDir . '/test_*.log');
+        $this->assertCount(1, $files);
+        $this->assertStringContainsString($expected, basename($files[0]));
+    }
+
+    public function testSetTimezoneAtRuntime(): void
+    {
+        $rotator = new LogRotator(100, 3, 'size');
+        $rotator->setTimezone('Asia/Tokyo');
+
+        file_put_contents($this->testLogFile, str_repeat('x', 150));
+
+        $expected = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Tokyo')))->format('Y-m-d_H-i');
+
+        $rotator->checkAndRotate($this->testLogFile);
+
+        $files = glob($this->testLogDir . '/test_*.log');
+        $this->assertCount(1, $files);
+        $this->assertStringContainsString($expected, basename($files[0]));
+    }
+
     public function testOldFilesCleanup(): void
     {
         $rotator = new LogRotator(100, 2, 'size');

@@ -52,10 +52,10 @@ class Logger implements LoggerInterface
         string $rotationStrategy = 'size',
         int $rotationInterval = 86400
     ) {
-        $this->config = new LoggerConfiguration($logFile, $timezone);
+        $this->config = new LoggerConfiguration($logFile);
         $this->fileSystem = new FileSystemManager();
         $this->interpolator = new ContextInterpolator();
-        $this->rotator = new LogRotator($maxFileSize, $maxFiles, $rotationStrategy, $rotationInterval);
+        $this->rotator = new LogRotator($maxFileSize, $maxFiles, $rotationStrategy, $rotationInterval, $timezone);
     }
 
     public function setLogFile(string $logFile): void
@@ -66,7 +66,7 @@ class Logger implements LoggerInterface
 
     public function setTimezone(string $timezone): void
     {
-        $this->config->setTimezone($timezone);
+        $this->rotator->setTimezone($timezone);
     }
 
     public function setMaxFileSize(int $maxFileSize): void

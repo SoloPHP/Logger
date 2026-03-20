@@ -29,13 +29,13 @@ $logger->info('Application started');
 $logger->error('An error occurred', ['error_code' => 500]);
 ```
 
-With custom timezone:
+With custom timezone for rotation file timestamps:
 
 ```php
 $logger = new Logger('/path/to/log/file.log', 'America/New_York');
 ```
 
-Change log file or timezone at runtime:
+Change log file or rotation timezone at runtime:
 
 ```php
 $logger->setLogFile('/path/to/another/file.log');
@@ -46,7 +46,7 @@ $logger->setTimezone('Asia/Tokyo');
 
 - PSR-3 Logger Interface compliance
 - Automatic log directory creation
-- Custom timezone support
+- Custom timezone for rotation file timestamps
 - Context interpolation
 - Safe file handling with locks
 - Support for all PSR-3 log levels
@@ -58,7 +58,7 @@ $logger->setTimezone('Asia/Tokyo');
 
 ## Requirements
 
-- PHP 7.4 or higher
+- PHP 8.1 or higher
 - psr/log package
 
 ## Log Levels
