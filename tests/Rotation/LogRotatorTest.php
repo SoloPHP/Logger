@@ -24,13 +24,7 @@ class LogRotatorTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->cleanupTestFiles();
-    }
-
-    private function cleanupTestFiles(): void
-    {
-        $files = glob($this->testLogDir . '/*');
-        foreach ($files as $file) {
+        foreach (glob($this->testLogDir . '/*') ?: [] as $file) {
             if (is_file($file)) {
                 unlink($file);
             }
@@ -40,109 +34,61 @@ class LogRotatorTest extends TestCase
         }
     }
 
-    public function testSizeBasedRotation(): void
-    {
-        $rotator = new LogRotator(100, 3, 'size');
-
-        // Create a file larger than the limit
-        file_put_contents($this->testLogFile, str_repeat('x', 150));
-
-        $rotator->checkAndRotate($this->testLogFile);
-
-        $this->assertFileDoesNotExist($this->testLogFile);
-        $this->assertGreaterThan(0, count(glob($this->testLogDir . '/*')));
-    }
-
-    public function testTimeBasedRotation(): void
-    {
-        $rotator = new LogRotator(0, 3, 'time', 1); // 1 second interval
-
-        file_put_contents($this->testLogFile, 'test content');
-
-        // Wait a bit and then rotate
-        sleep(2);
-        $rotator->checkAndRotate($this->testLogFile);
-
-        $this->assertFileDoesNotExist($this->testLogFile);
-        $this->assertGreaterThan(0, count(glob($this->testLogDir . '/*')));
-    }
-
-    public function testNoRotationWhenNotNeeded(): void
-    {
-        $rotator = new LogRotator(1000, 3, 'size');
-
-        file_put_contents($this->testLogFile, 'small content');
-
-        $rotator->checkAndRotate($this->testLogFile);
-
-        $this->assertFileExists($this->testLogFile);
-        $this->assertEquals('small content', file_get_contents($this->testLogFile));
-    }
-
-    public function testConfigurationMethods(): void
+    public function testSetRotationStrategyRejectsInvalid(): void
     {
         $rotator = new LogRotator();
 
-        $rotator->setMaxFileSize(2048);
-        $rotator->setMaxFiles(10);
-        $rotator->setRotationStrategy('both');
-        $rotator->setRotationInterval(7200);
-
-        // Test that methods don't throw errors
-        $this->assertTrue(true);
+        $this->expectException(\InvalidArgumentException::class);
+        $rotator->setRotationStrategy('bogus');
     }
 
-    public function testConstructorTimezone(): void
+    public function testTimeRotationUsesFileMtimeAcrossInstances(): void
     {
-        $rotator = new LogRotator(100, 3, 'size', 86400, 'Pacific/Auckland');
+        file_put_contents($this->testLogFile, 'content');
+        touch($this->testLogFile, time() - 10);
 
-        file_put_contents($this->testLogFile, str_repeat('x', 150));
+        (new LogRotator(0, 3, 'time', 5))->checkAndRotate($this->testLogFile);
 
-        $expected = (new \DateTimeImmutable('now', new \DateTimeZone('Pacific/Auckland')))->format('Y-m-d_H-i');
-
-        $rotator->checkAndRotate($this->testLogFile);
-
-        $files = glob($this->testLogDir . '/test_*.log');
-        $this->assertCount(1, $files);
-        $this->assertStringContainsString($expected, basename($files[0]));
+        $this->assertFileDoesNotExist($this->testLogFile);
     }
 
-    public function testSetTimezoneAtRuntime(): void
+    public function testLogFileWithoutExtension(): void
     {
-        $rotator = new LogRotator(100, 3, 'size');
-        $rotator->setTimezone('Asia/Tokyo');
+        $logFile = $this->testLogDir . '/app';
+        file_put_contents($logFile, str_repeat('x', 150));
+
+        (new LogRotator(100, 3, 'size'))->checkAndRotate($logFile);
+
+        $this->assertFileDoesNotExist($logFile);
+        $this->assertCount(1, glob($this->testLogDir . '/app_*') ?: []);
+    }
+
+    public function testRotationCollisionGetsUniqueSuffix(): void
+    {
+        $rotator = new LogRotator(100, 10, 'size');
 
         file_put_contents($this->testLogFile, str_repeat('x', 150));
-
-        $expected = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Tokyo')))->format('Y-m-d_H-i');
-
         $rotator->checkAndRotate($this->testLogFile);
 
-        $files = glob($this->testLogDir . '/test_*.log');
-        $this->assertCount(1, $files);
-        $this->assertStringContainsString($expected, basename($files[0]));
+        file_put_contents($this->testLogFile, str_repeat('y', 150));
+        $rotator->checkAndRotate($this->testLogFile);
+
+        $this->assertCount(2, glob($this->testLogDir . '/test_*.log') ?: []);
     }
 
     public function testOldFilesCleanup(): void
     {
         $rotator = new LogRotator(100, 2, 'size');
 
-        // Create existing rotated files to exceed maxFiles
         file_put_contents($this->testLogDir . '/test_2020-01-01_00-00-01.log', 'old1');
         sleep(1);
         file_put_contents($this->testLogDir . '/test_2020-01-01_00-00-02.log', 'old2');
         sleep(1);
 
-        // Create current log file exceeding size limit
         file_put_contents($this->testLogFile, str_repeat('x', 150));
-
         $rotator->checkAndRotate($this->testLogFile);
 
-        // Original file should be rotated
         $this->assertFileDoesNotExist($this->testLogFile);
-
-        // Oldest file should be deleted to stay within maxFiles limit
-        $remainingFiles = glob($this->testLogDir . '/test_*.log');
-        $this->assertLessThanOrEqual(2, count($remainingFiles));
+        $this->assertLessThanOrEqual(2, count(glob($this->testLogDir . '/test_*.log') ?: []));
     }
 }

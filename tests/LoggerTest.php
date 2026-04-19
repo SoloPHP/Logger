@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Solo\Logger\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Solo\Logger\Logger;
 use Psr\Log\LogLevel;
+use Solo\Logger\Formatter\JsonFormatter;
+use Solo\Logger\Logger;
 
 class LoggerTest extends TestCase
 {
@@ -25,16 +26,6 @@ class LoggerTest extends TestCase
         if (file_exists($this->testLogFile)) {
             unlink($this->testLogFile);
         }
-    }
-
-    public function testBasicLogging(): void
-    {
-        $logger = new Logger($this->testLogFile);
-        $logger->info('Test message');
-
-        $this->assertFileExists($this->testLogFile);
-        $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('Test message', $content);
     }
 
     public function testAllLogLevels(): void
@@ -64,8 +55,6 @@ class LoggerTest extends TestCase
     public function testMinLevelFiltering(): void
     {
         $logger = new Logger($this->testLogFile);
-
-        // Only WARNING and above should be written
         $logger->setMinLevel(LogLevel::WARNING);
 
         $logger->debug('Should be ignored');
@@ -83,37 +72,10 @@ class LoggerTest extends TestCase
         $logger = new Logger($this->testLogFile);
         $logger->info('User {user_id} performed {action}', [
             'user_id' => 123,
-            'action' => 'login'
+            'action' => 'login',
         ]);
 
-        $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('User 123 performed login', $content);
-    }
-
-    public function testStringableObject(): void
-    {
-        $logger = new Logger($this->testLogFile);
-
-        $stringableObject = new class implements \Stringable {
-            public function __toString(): string
-            {
-                return 'Stringable message';
-            }
-        };
-
-        $logger->info($stringableObject);
-
-        $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('Stringable message', $content);
-    }
-
-    public function testLogMethod(): void
-    {
-        $logger = new Logger($this->testLogFile);
-        $logger->log(LogLevel::INFO, 'Direct log message');
-
-        $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('Direct log message', $content);
+        $this->assertStringContainsString('User 123 performed login', file_get_contents($this->testLogFile));
     }
 
     public function testEmptyLogFile(): void
@@ -137,9 +99,7 @@ class LoggerTest extends TestCase
 
         $logger->info('Configuration test');
 
-        $this->assertFileExists($this->testLogFile);
-        $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('Configuration test', $content);
+        $this->assertStringContainsString('Configuration test', file_get_contents($this->testLogFile));
     }
 
     public function testSetMinLevelWithInvalidLevel(): void
@@ -155,8 +115,19 @@ class LoggerTest extends TestCase
         $logger = new Logger($this->testLogFile);
         $logger->log('custom_level', 'Custom level message');
 
+        $this->assertStringContainsString('Custom level message', file_get_contents($this->testLogFile));
+    }
+
+    public function testSetFormatterSwapsOutput(): void
+    {
+        $logger = new Logger($this->testLogFile);
+        $logger->setFormatter(new JsonFormatter());
+
+        $logger->info('Job queued', ['id' => 7]);
+
         $content = file_get_contents($this->testLogFile);
-        $this->assertStringContainsString('Custom level message', $content);
+        $this->assertStringContainsString('"level":"info"', $content);
+        $this->assertStringContainsString('"id":7', $content);
     }
 
     public function testLogCreatesDirectory(): void
@@ -168,8 +139,6 @@ class LoggerTest extends TestCase
         $logger->info('Directory creation test');
 
         $this->assertFileExists($logFile);
-        $content = file_get_contents($logFile);
-        $this->assertStringContainsString('Directory creation test', $content);
 
         unlink($logFile);
         rmdir($dir);

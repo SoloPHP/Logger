@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace Solo\Logger;
 
+use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Solo\Logger\Configuration\LoggerConfiguration;
 use Solo\Logger\FileSystem\FileSystemManager;
-use Solo\Logger\Interpolation\ContextInterpolator;
+use Solo\Logger\Formatter\FormatterInterface;
+use Solo\Logger\Formatter\LineFormatter;
 use Solo\Logger\Rotation\LogRotator;
 
 class Logger implements LoggerInterface
 {
     private LoggerConfiguration $config;
     private FileSystemManager $fileSystem;
-    private ContextInterpolator $interpolator;
+    private FormatterInterface $formatter;
     private LogRotator $rotator;
     /**
      * Minimal log level that will be recorded. Levels below this threshold will be ignored.
@@ -50,12 +52,18 @@ class Logger implements LoggerInterface
         int $maxFileSize = 0,
         int $maxFiles = 0,
         string $rotationStrategy = 'size',
-        int $rotationInterval = 86400
+        int $rotationInterval = 86400,
+        ?FormatterInterface $formatter = null
     ) {
         $this->config = new LoggerConfiguration($logFile);
         $this->fileSystem = new FileSystemManager();
-        $this->interpolator = new ContextInterpolator();
+        $this->formatter = $formatter ?? new LineFormatter();
         $this->rotator = new LogRotator($maxFileSize, $maxFiles, $rotationStrategy, $rotationInterval, $timezone);
+    }
+
+    public function setFormatter(FormatterInterface $formatter): void
+    {
+        $this->formatter = $formatter;
     }
 
     public function setLogFile(string $logFile): void
@@ -160,18 +168,16 @@ class Logger implements LoggerInterface
             return;
         }
 
-        $this->fileSystem->ensureLogDirectory($logFile);
-        $this->rotator->checkAndRotate($logFile);
-
-        // Filter by minimal level
+        // Filter by minimal level first — formatter call + directory/rotation checks are wasted work otherwise.
         if (!$this->isLevelAllowed($level)) {
             return;
         }
 
-        $interpolatedMessage = $this->interpolator->interpolate($message, $context);
+        $this->fileSystem->ensureLogDirectory($logFile);
+        $this->rotator->checkAndRotate($logFile);
 
-        $logLine = $interpolatedMessage . PHP_EOL;
+        $line = $this->formatter->format((string) $level, $message, $context, new DateTimeImmutable());
 
-        $this->fileSystem->writeLogLine($logFile, $logLine);
+        $this->fileSystem->writeLogLine($logFile, $line . PHP_EOL);
     }
 }

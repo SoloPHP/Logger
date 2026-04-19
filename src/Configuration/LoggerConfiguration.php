@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Solo\Logger\Configuration;
 
-class LoggerConfiguration
+final class LoggerConfiguration
 {
     private string $logFile;
 
