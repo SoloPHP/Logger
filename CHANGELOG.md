@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 — Unreleased
+## 2.0.0 — 2026-11-01
 
 A rewrite around three parts — a writer, a formatter and a clock — with rotation coordinated across processes, one bounded line per record in every format, and output failures that throw instead of disappearing. See the [upgrade guide](UPGRADE.md).
 
