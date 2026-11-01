@@ -43,7 +43,7 @@ final readonly class LineFormatter implements FormatterInterface
 [2026-11-01T09:30:00.123456+00:00] INFO: User 42 signed in {"id":42}
 ```
 
-The message comes from the normalizer's [`interpolate()`](#contextnormalizer). `{channel}` is the channel and a dot, or nothing; `{context}` a space and the context as JSON, or nothing. The time, the channel, the level and the message are escaped: control characters C-style, invalid UTF-8 as U+FFFD. See [LineFormatter](/features/formatters#lineformatter).
+The message comes from the normalizer's [`interpolate()`](#contextnormalizer). `{channel}` is the channel and a dot, or nothing; `{context}` a space and the context as JSON, or nothing. The channel, the level and the message are escaped: control characters C-style, invalid UTF-8 as U+FFFD. The template and the date format are configuration, written as they are. See [LineFormatter](/features/formatters#lineformatter).
 
 ---
 
