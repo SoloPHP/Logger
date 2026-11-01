@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Solo\Logger\Tests;
+namespace Solo\Logger\Tests\Decorator;
 
 use PHPUnit\Framework\TestCase;
 use Psr\Log\InvalidArgumentException;
 use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
-use Solo\Logger\FanOutLogger;
+use Solo\Logger\Decorator\FanOutLogger;
 use Solo\Logger\Formatter\JsonFormatter;
 use Solo\Logger\Logger;
 use Solo\Logger\Tests\Support\MemoryWriter;

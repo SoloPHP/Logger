@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Solo\Logger;
+namespace Solo\Logger\Decorator;
 
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
+use Solo\Logger\LevelAwareLoggerInterface;
+use Solo\Logger\Levels;
 use Solo\Logger\Writer\WriteException;
 
 /**

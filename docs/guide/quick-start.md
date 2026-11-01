@@ -152,7 +152,7 @@ $logger = Logger::stream(formatter: new JsonFormatter());
 A record that cannot be written — the directory cannot be created, the disk is full — throws `Solo\Logger\Writer\WriteException`, a `RuntimeException`. The logger never drops a record silently and never retries one. To keep a broken destination from failing requests, wrap the logger:
 
 ```php
-use Solo\Logger\FailSafeLogger;
+use Solo\Logger\Decorator\FailSafeLogger;
 
 $logger = new FailSafeLogger(Logger::file('/var/log/app/app.log'));
 ```

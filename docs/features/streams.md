@@ -54,7 +54,7 @@ An FPM worker's standard error reaches the FPM log only with `catch_workers_outp
 
 ```php
 use Psr\Log\LogLevel;
-use Solo\Logger\FanOutLogger;
+use Solo\Logger\Decorator\FanOutLogger;
 
 $logger = new FanOutLogger(
     Logger::file('/var/log/app/app.log'),

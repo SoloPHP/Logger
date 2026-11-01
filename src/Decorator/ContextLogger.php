@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Solo\Logger;
+namespace Solo\Logger\Decorator;
 
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
+use Solo\Logger\LevelAwareLoggerInterface;
+use Solo\Logger\Levels;
 
 /** Adds the same context, such as a request id or a worker name, to every record; a key passed to a call wins. */
 final class ContextLogger extends AbstractLogger implements LevelAwareLoggerInterface

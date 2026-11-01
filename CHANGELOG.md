@@ -28,7 +28,7 @@ A rewrite around three parts — a writer, a formatter and a clock — with rota
 - **`StreamWriter` and `Logger::stream()`**, for standard error and other streams.
 - **Formatters.** `JsonFormatter` and `LogfmtFormatter` with a fixed schema. `LineFormatter` templates take the tokens `{time}`, `{channel}`, `{level}`, `{message}` and `{context}`.
 - **`ContextNormalizer`.** Bounded depth, entries and string length, and `redactKeys`. `interpolate()`, `encode()` and `validUtf8()` let your own formatters write what the built-in ones write; `withDateFormat()` keeps a formatter's dates in one format.
-- **Decorators.** `FanOutLogger`, `FailSafeLogger` and `ContextLogger`.
+- **Decorators** in `Solo\Logger\Decorator`: `FanOutLogger`, `FailSafeLogger` and `ContextLogger`.
 - **Channels.** `new Logger(channel: …)` and `withChannel()`.
 - **`isHandling()`** on `Logger` and on the decorators, through `LevelAwareLoggerInterface`.
 - **Clocks.** `SystemClock`, or any PSR-20 clock, for record times and archive names.

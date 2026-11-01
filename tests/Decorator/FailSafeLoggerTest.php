@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Solo\Logger\Tests;
+namespace Solo\Logger\Tests\Decorator;
 
 use Psr\Log\InvalidArgumentException;
 use Psr\Log\LogLevel;
 use Psr\Log\NullLogger;
-use Solo\Logger\FailSafeLogger;
+use Solo\Logger\Decorator\FailSafeLogger;
 use Solo\Logger\Logger;
 use Solo\Logger\Tests\Support\MemoryWriter;
 use Solo\Logger\Tests\Support\SpyLogger;

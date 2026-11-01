@@ -5,7 +5,7 @@ Each decorator extends `Psr\Log\AbstractLogger`, implements [`LevelAwareLoggerIn
 ## FanOutLogger
 
 ```php
-namespace Solo\Logger;
+namespace Solo\Logger\Decorator;
 
 final class FanOutLogger extends AbstractLogger implements LevelAwareLoggerInterface
 {
@@ -22,7 +22,7 @@ final class FanOutLogger extends AbstractLogger implements LevelAwareLoggerInter
 ## FailSafeLogger
 
 ```php
-namespace Solo\Logger;
+namespace Solo\Logger\Decorator;
 
 final class FailSafeLogger extends AbstractLogger implements LevelAwareLoggerInterface
 {
@@ -45,7 +45,7 @@ final class FailSafeLogger extends AbstractLogger implements LevelAwareLoggerInt
 ## ContextLogger
 
 ```php
-namespace Solo\Logger;
+namespace Solo\Logger\Decorator;
 
 final class ContextLogger extends AbstractLogger implements LevelAwareLoggerInterface
 {

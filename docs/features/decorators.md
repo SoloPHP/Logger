@@ -12,7 +12,7 @@ A decorator wraps a PSR-3 logger and adds one behaviour. Three ship with the pac
 
 ```php
 use Psr\Log\LogLevel;
-use Solo\Logger\FanOutLogger;
+use Solo\Logger\Decorator\FanOutLogger;
 use Solo\Logger\Formatter\JsonFormatter;
 use Solo\Logger\Logger;
 
@@ -29,7 +29,7 @@ Each logger keeps its own destination, format and threshold. A failing logger do
 A failing destination — a full disk, a permission error — throws `WriteException` from the log call. To keep it from failing a request:
 
 ```php
-use Solo\Logger\FailSafeLogger;
+use Solo\Logger\Decorator\FailSafeLogger;
 
 $logger = new FailSafeLogger(Logger::file('/var/log/app/app.log'));
 ```
@@ -49,7 +49,7 @@ A `WriteException` does not prove that nothing was written: see [Failures](/feat
 ## Shared Context
 
 ```php
-use Solo\Logger\ContextLogger;
+use Solo\Logger\Decorator\ContextLogger;
 
 $logger = new ContextLogger($logger, ['request_id' => 'req-42']);
 
