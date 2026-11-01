@@ -4,42 +4,50 @@ declare(strict_types=1);
 
 namespace Solo\Logger\Formatter;
 
-use DateTimeInterface;
-use Solo\Logger\Interpolation\ContextInterpolator;
+use Solo\Logger\Context\ContextNormalizer;
+use Solo\Logger\LogRecord;
 
-/**
- * Plain-text line formatter with a configurable template and PSR-3 `{placeholder}` interpolation.
- *
- * Template placeholders resolved by the formatter itself:
- *   {time}     → ISO 8601 timestamp
- *   {level}    → PSR-3 level
- *   {message}  → message (already interpolated against $context)
- *
- * Context keys referenced directly in the message (e.g. `"Hello {name}"` + `['name' => 'World']`)
- * are resolved by `ContextInterpolator` before {message} replacement.
- */
-final class LineFormatter implements FormatterInterface
+final readonly class LineFormatter implements FormatterInterface
 {
-    public const DEFAULT_TEMPLATE = '[{time}] {level}: {message}';
+    public const string DEFAULT_TEMPLATE = '[{time}] {channel}{level}: {message}{context}';
 
-    private readonly ContextInterpolator $interpolator;
+    private ContextNormalizer $normalizer;
+    private bool $writesContext;
 
+    /** @param string|null $dateFormat the format of every date written, the normalizer's when null */
     public function __construct(
-        private readonly string $template = self::DEFAULT_TEMPLATE,
-        private readonly string $dateFormat = DateTimeInterface::ATOM,
-        ?ContextInterpolator $interpolator = null,
+        private string $template = self::DEFAULT_TEMPLATE,
+        ?string $dateFormat = null,
+        ?ContextNormalizer $normalizer = null,
     ) {
-        $this->interpolator = $interpolator ?? new ContextInterpolator();
+        $normalizer ??= new ContextNormalizer();
+        $this->normalizer = $dateFormat === null ? $normalizer : $normalizer->withDateFormat($dateFormat);
+        // The template and the date format are trusted configuration, written as they are: they must fit on a line.
+        if (strpbrk($template . $this->normalizer->dateFormat, "\r\n") !== false) {
+            throw new \InvalidArgumentException('The template and the date format must fit on one line.');
+        }
+        $this->writesContext = str_contains($template, '{context}');
     }
 
-    public function format(string $level, string|\Stringable $message, array $context, DateTimeInterface $time): string
+    #[\Override]
+    public function format(LogRecord $record): string
     {
-        $interpolated = $this->interpolator->interpolate($message, $context);
+        $context = $this->writesContext ? $this->normalizer->normalize($record->context) : [];
 
+        // Everything the record supplies is escaped onto one line.
+        // Like {context}, {channel} brings its own separator, so the default line reads the same without one.
         return strtr($this->template, [
-            '{time}' => $time->format($this->dateFormat),
-            '{level}' => strtoupper($level),
-            '{message}' => $interpolated,
+            '{time}' => $record->time->format($this->normalizer->dateFormat),
+            '{channel}' => $record->channel === null ? '' : self::escape($record->channel) . '.',
+            '{level}' => self::escape(strtoupper($record->level)),
+            '{message}' => self::escape($this->normalizer->interpolate($record->message, $record->context)),
+            '{context}' => $context === [] ? '' : ' ' . ContextNormalizer::encode((object) $context),
         ]);
+    }
+
+    /** Valid UTF-8 with control characters escaped: no line breaks, no terminal escape sequences. */
+    private static function escape(string $text): string
+    {
+        return addcslashes(ContextNormalizer::validUtf8($text), "\0..\37\177");
     }
 }

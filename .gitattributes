@@ -1,0 +1,10 @@
+# LF in every checkout, Windows included: tests compare file contents byte for byte.
+* text=auto eol=lf
+
+/.github export-ignore
+/docs export-ignore
+/tests export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/phpstan.neon export-ignore
+/phpunit.xml export-ignore

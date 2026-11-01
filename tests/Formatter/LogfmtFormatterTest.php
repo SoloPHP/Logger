@@ -4,57 +4,88 @@ declare(strict_types=1);
 
 namespace Solo\Logger\Tests\Formatter;
 
-use DateTimeImmutable;
-use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use Solo\Logger\Formatter\LogfmtFormatter;
+use Solo\Logger\LogRecord;
 
-class LogfmtFormatterTest extends TestCase
+final class LogfmtFormatterTest extends TestCase
 {
-    private DateTimeImmutable $time;
-
-    protected function setUp(): void
+    public function testContextKeysAreNamespacedAndReversiblyEncoded(): void
     {
-        $this->time = new DateTimeImmutable('2026-04-19T10:15:30+00:00', new DateTimeZone('UTC'));
-    }
-
-    public function testThrowableCoercedToMessage(): void
-    {
-        $out = (new LogfmtFormatter())->format(
-            'error',
-            'failed',
-            ['exception' => new \RuntimeException('boom')],
-            $this->time,
-        );
-
-        $this->assertStringContainsString('exception=boom', $out);
-    }
-
-    public function testArrayContextSerializedAsJson(): void
-    {
-        $out = (new LogfmtFormatter())->format('info', 'Msg', ['arr' => ['a', 'b']], $this->time);
-
-        $this->assertStringContainsString('arr="[\\"a\\",\\"b\\"]"', $out);
-    }
-
-    public function testNullValueRenderedAsEmpty(): void
-    {
-        $out = (new LogfmtFormatter())->format('info', 'Msg', ['n' => null], $this->time);
-
-        $this->assertStringContainsString('n=""', $out);
-    }
-
-    public function testStringableObject(): void
-    {
-        $obj = new class implements \Stringable {
-            public function __toString(): string
-            {
-                return 'stringified';
+        $context = [
+            'time' => 'wrong', 'level' => 'debug', 'message' => 'replacement', 'a b' => 'space',
+            'a=b' => 'equals', 'a_b' => 'underscore', 'quote"key' => 'quote', '%' => 'percent',
+            '%20' => 'literal percent', '' => 'empty key', 123 => 'numeric',
+        ];
+        $pairs = $this->parse($this->format('Original', $context));
+        self::assertSame('error', $pairs['level']);
+        self::assertSame('Original', $pairs['message']);
+        self::assertSame('2026-10-31T12:00:00.000000+00:00', $pairs['time']);
+        $decodedContext = [];
+        foreach ($pairs as $key => $value) {
+            if (str_starts_with($key, 'context.')) {
+                $decodedContext[rawurldecode(substr($key, 8))] = $value;
             }
-        };
+        }
+        self::assertSame($context, $decodedContext);
+    }
 
-        $out = (new LogfmtFormatter())->format('info', 'Msg', ['obj' => $obj], $this->time);
+    public function testValuesRoundTripWithControlCharactersQuotesBackslashesAndUnicode(): void
+    {
+        $value = "\"quoted\" \\backslash /path = equals\n\r\t\0 Україна";
+        $output = $this->format($value, ['value' => $value, 'bool' => false, 'null' => null, 'array' => ['a', 'b']]);
+        self::assertStringNotContainsString("\n", $output);
+        $pairs = $this->parse($output);
+        self::assertSame($value, $pairs['message']);
+        self::assertSame($value, $pairs['context.value']);
+        self::assertSame('false', $pairs['context.bool']);
+        self::assertSame('null', $pairs['context.null']);
+        self::assertSame(['a', 'b'], json_decode($pairs['context.array'], true));
+    }
 
-        $this->assertStringContainsString('obj=stringified', $out);
+    public function testPathsAndUnicodeStayReadable(): void
+    {
+        $output = $this->format('GET /api/users Україна', ['path' => '/a/b', 'tags' => ['київ']]);
+        self::assertStringContainsString('message="GET /api/users Україна"', $output);
+        self::assertStringContainsString('context.path="/a/b"', $output);
+        self::assertStringContainsString('context.tags="[\"київ\"]"', $output);
+    }
+
+    public function testMessageIsInterpolatedAndChannelFollowsTheLevel(): void
+    {
+        $record = new LogRecord(
+            'info',
+            'User {id} signed in',
+            ['id' => 42],
+            new \DateTimeImmutable('2026-10-31T12:00:00+00:00'),
+            'auth',
+        );
+        self::assertSame(
+            'time="2026-10-31T12:00:00.000000+00:00" level="info" channel="auth" message="User 42 signed in" '
+            . 'context.id="42"',
+            (new LogfmtFormatter())->format($record),
+        );
+    }
+
+    private function format(string $message, array $context): string
+    {
+        return (new LogfmtFormatter())->format(new LogRecord(
+            'error',
+            $message,
+            $context,
+            new \DateTimeImmutable('2026-10-31T12:00:00+00:00')
+        ));
+    }
+
+    private function parse(string $line): array
+    {
+        $pairs = [];
+        while ($line !== '') {
+            self::assertSame(1, preg_match('/\A([^\s="\\x00-\\x1f]+)=("(?:[^"\\\\]|\\\\.)*")(?: |$)/s', $line, $match));
+            self::assertArrayNotHasKey($match[1], $pairs);
+            $pairs[$match[1]] = json_decode($match[2], true, flags: JSON_THROW_ON_ERROR);
+            $line = substr($line, strlen($match[0]));
+        }
+        return $pairs;
     }
 }
