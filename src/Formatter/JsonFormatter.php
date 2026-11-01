@@ -4,118 +4,30 @@ declare(strict_types=1);
 
 namespace Solo\Logger\Formatter;
 
-use DateTimeInterface;
+use Solo\Logger\Context\ContextNormalizer;
+use Solo\Logger\LogRecord;
 
-/**
- * Structured single-line JSON (NDJSON) formatter — suited for ELK / Loki / Graylog
- * and any log pipeline that parses one JSON object per line.
- *
- * Output shape:
- *   {"time":"2026-04-19T19:32:04+00:00","level":"info","message":"Job queued","id":3, ...}
- *
- * All `$context` keys are merged into the top-level record as flat fields.
- */
-final class JsonFormatter implements FormatterInterface
+final readonly class JsonFormatter implements FormatterInterface
 {
-    private const RESERVED_KEYS = ['time', 'level', 'message'];
+    private ContextNormalizer $normalizer;
 
-    public function __construct(
-        private readonly string $dateFormat = DateTimeInterface::ATOM,
-        private readonly int $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
-    ) {
+    /** @param string|null $dateFormat the format of every date written, the normalizer's when null */
+    public function __construct(?string $dateFormat = null, ?ContextNormalizer $normalizer = null)
+    {
+        $normalizer ??= new ContextNormalizer();
+        $this->normalizer = $dateFormat === null ? $normalizer : $normalizer->withDateFormat($dateFormat);
     }
 
-    public function format(string $level, string|\Stringable $message, array $context, DateTimeInterface $time): string
+    #[\Override]
+    public function format(LogRecord $record): string
     {
-        $record = [
-            'time' => $time->format($this->dateFormat),
-            'level' => $level,
-            'message' => (string) $message,
-        ];
+        $fields = ['time' => $record->time->format($this->normalizer->dateFormat), 'level' => $record->level];
+        if ($record->channel !== null) {
+            $fields['channel'] = $record->channel;
+        }
+        $fields['message'] = $this->normalizer->interpolate($record->message, $record->context);
+        $fields['context'] = (object) $this->normalizer->normalize($record->context);
 
-        foreach ($context as $key => $value) {
-            if (in_array($key, self::RESERVED_KEYS, true)) {
-                // Don't overwrite reserved top-level keys — namespace under context.
-                $record['context'][$key] = $this->normalize($value);
-                continue;
-            }
-            $record[$key] = $this->normalize($value);
-        }
-
-        return $this->safeEncode($record);
-    }
-
-    /**
-     * JSON-safe value coercion. Order matters:
-     *   Throwable chain → structured trace+previous
-     *   DateTimeInterface → formatted string (checked before Stringable — a user class
-     *     could extend DateTime and add __toString; format string is more useful than default str)
-     *   Stringable object → (string) cast
-     *   Array → recursively normalized
-     *   Scalars/null → as-is
-     */
-    private function normalize(mixed $value): mixed
-    {
-        if ($value instanceof \Throwable) {
-            return $this->normalizeThrowable($value);
-        }
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format($this->dateFormat);
-        }
-        if (is_object($value) && method_exists($value, '__toString')) {
-            return (string) $value;
-        }
-        if (is_array($value)) {
-            return array_map(fn($v) => $this->normalize($v), $value);
-        }
-        if (is_object($value)) {
-            // Plain objects — render a safe marker instead of letting json_encode leak internals.
-            return ['__class' => $value::class];
-        }
-        return $value;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function normalizeThrowable(\Throwable $e): array
-    {
-        $record = [
-            'class' => $e::class,
-            'message' => $e->getMessage(),
-            'code' => $e->getCode(),
-            'file' => $e->getFile(),
-            'line' => $e->getLine(),
-        ];
-        if ($e->getPrevious() !== null) {
-            $record['previous'] = $this->normalizeThrowable($e->getPrevious());
-        }
-        return $record;
-    }
-
-    /**
-     * @param array<string, mixed> $record
-     */
-    private function safeEncode(array $record): string
-    {
-        $encoded = json_encode($record, $this->jsonFlags);
-        if ($encoded !== false) {
-            return $encoded;
-        }
-
-        // Recover from malformed UTF-8 / circular refs — never emit an empty log line.
-        $fallback = json_encode(
-            [
-                'time' => $record['time'] ?? '',
-                'level' => $record['level'] ?? '',
-                'message' => is_string($record['message'] ?? null) ? $record['message'] : '',
-                'json_error' => json_last_error_msg(),
-            ],
-            $this->jsonFlags | JSON_PARTIAL_OUTPUT_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE,
-        );
-
-        return $fallback !== false
-            ? $fallback
-            : '{"json_error":"unrecoverable"}';
+        return ContextNormalizer::encode($fields);
     }
 }

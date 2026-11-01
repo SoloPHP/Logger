@@ -4,107 +4,103 @@ declare(strict_types=1);
 
 namespace Solo\Logger\Tests\Formatter;
 
-use DateTimeImmutable;
-use DateTimeZone;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Solo\Logger\Context\ContextNormalizer;
 use Solo\Logger\Formatter\JsonFormatter;
+use Solo\Logger\LogRecord;
 
-class JsonFormatterTest extends TestCase
+final class JsonFormatterTest extends TestCase
 {
-    private DateTimeImmutable $time;
-
-    protected function setUp(): void
+    public function testContextCannotOverwriteMetadataInEitherOrder(): void
     {
-        $this->time = new DateTimeImmutable('2026-04-19T10:15:30+00:00', new DateTimeZone('UTC'));
+        $context = ['context' => 'user data', 'message' => 'replacement', 'level' => 'debug', 'time' => 'other'];
+        foreach ([$context, array_reverse($context, true)] as $values) {
+            $json = (new JsonFormatter())->format($this->record($values));
+            $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame('error', $decoded['level']);
+            self::assertSame('Original', $decoded['message']);
+            self::assertSame('2026-10-31T12:00:00.000000+00:00', $decoded['time']);
+            self::assertSame($values, $decoded['context']);
+            self::assertSame(['time', 'level', 'message', 'context'], array_keys($decoded));
+        }
     }
 
-    public function testReservedKeysGetNamespacedUnderContext(): void
+    public function testEmptyAndNumericContextsKeepAnObjectSchema(): void
     {
-        $json = (new JsonFormatter())->format('info', 'Msg', [
-            'time' => 'user-time',
-            'level' => 'user-level',
-            'message' => 'user-msg',
-            'safe' => 'ok',
-        ], $this->time);
-
-        $decoded = json_decode($json, true);
-        $this->assertSame('2026-04-19T10:15:30+00:00', $decoded['time']);
-        $this->assertSame('info', $decoded['level']);
-        $this->assertSame('Msg', $decoded['message']);
-        $this->assertSame('ok', $decoded['safe']);
-        $this->assertSame('user-time', $decoded['context']['time']);
-        $this->assertSame('user-level', $decoded['context']['level']);
-        $this->assertSame('user-msg', $decoded['context']['message']);
+        foreach ([[], [0 => 'zero', 1 => 'one']] as $context) {
+            $decoded = json_decode((new JsonFormatter())->format($this->record($context)), flags: JSON_THROW_ON_ERROR);
+            self::assertInstanceOf(\stdClass::class, $decoded->context);
+            self::assertSame($context, (array) $decoded->context);
+        }
     }
 
-    public function testThrowableChainCaptured(): void
+    public function testInvalidUtf8PreservesHealthyFieldsAndExceptions(): void
     {
-        $root = new \LogicException('root cause', 42);
-        $top = new \RuntimeException('top', 44, $root);
-
-        $json = (new JsonFormatter())->format('error', 'failed', ['exception' => $top], $this->time);
-
-        $decoded = json_decode($json, true);
-        $this->assertSame('top', $decoded['exception']['message']);
-        $this->assertSame(44, $decoded['exception']['code']);
-        $this->assertSame('root cause', $decoded['exception']['previous']['message']);
-        $this->assertSame(42, $decoded['exception']['previous']['code']);
+        $context = ['payload' => "\xB1\x31", 'request_id' => 'req-42', 'exception' => new \RuntimeException('failure')];
+        $json = (new JsonFormatter())->format($this->record($context));
+        $decoded = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame("\u{FFFD}1", $decoded['context']['payload']);
+        self::assertSame('req-42', $decoded['context']['request_id']);
+        self::assertSame('failure', $decoded['context']['exception']['message']);
     }
 
-    public function testStringableObjectInContext(): void
+    public function testMessageIsInterpolatedAndStaysOnOneLine(): void
     {
-        $obj = new class implements \Stringable {
-            public function __toString(): string
-            {
-                return 'stringified';
-            }
-        };
-
-        $json = (new JsonFormatter())->format('info', 'Msg', ['obj' => $obj], $this->time);
-
-        $this->assertSame('stringified', json_decode($json, true)['obj']);
+        $output = (new JsonFormatter())->format($this->record(['id' => 42], "User {id}\n\"quoted\" / Україна"));
+        self::assertStringNotContainsString("\n", $output);
+        self::assertSame("User 42\n\"quoted\" / Україна", json_decode($output, true)['message']);
     }
 
-    public function testDateTimeBeatsStringableWhenBothApply(): void
+    public function testMessageNamesAnExceptionWhileTheContextDescribesIt(): void
     {
-        $dtWithToString = new class ('2026-04-19T10:15:30+00:00') extends \DateTimeImmutable implements \Stringable {
-            public function __toString(): string
-            {
-                return 'wrong';
-            }
-        };
-
-        $json = (new JsonFormatter('Y-m-d'))->format('info', 'm', ['when' => $dtWithToString], $this->time);
-
-        $this->assertSame('2026-04-19', json_decode($json, true)['when']);
+        $record = $this->record(['exception' => new \LogicException('boom')], 'Failed: {exception}');
+        $decoded = json_decode((new JsonFormatter())->format($record), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('Failed: LogicException: boom', $decoded['message']);
+        self::assertSame('LogicException', $decoded['context']['exception']['class']);
     }
 
-    public function testNestedArrayNormalized(): void
+    public function testChannelFollowsTheLevelWhenTheRecordHasOne(): void
     {
-        $json = (new JsonFormatter())->format(
-            'error',
-            'm',
-            ['nested' => ['err' => new \RuntimeException('boom')]],
-            $this->time,
+        $time = new \DateTimeImmutable('2026-10-31T12:00:00+00:00');
+        $record = new LogRecord('error', 'Original', [], $time, 'payments');
+        $decoded = json_decode((new JsonFormatter())->format($record), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['time', 'level', 'channel', 'message', 'context'], array_keys($decoded));
+        self::assertSame('payments', $decoded['channel']);
+    }
+
+    #[DataProvider('dateFormats')]
+    public function testEveryDateFollowsOneFormat(JsonFormatter $formatter, string $time, string $due): void
+    {
+        $record = new LogRecord(
+            'info',
+            'Due',
+            ['due' => new \DateTimeImmutable('2026-12-24T10:00:00+00:00')],
+            new \DateTimeImmutable('2026-10-31T12:00:00+00:00'),
         );
-
-        $this->assertSame('boom', json_decode($json, true)['nested']['err']['message']);
+        $decoded = json_decode($formatter->format($record), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([$time, $due], [$decoded['time'], $decoded['context']['due']]);
     }
 
-    public function testPlainObjectRenderedAsClassMarker(): void
+    public static function dateFormats(): array
     {
-        $json = (new JsonFormatter())->format('info', 'm', ['obj' => new \stdClass()], $this->time);
-
-        $this->assertSame(['__class' => \stdClass::class], json_decode($json, true)['obj']);
+        $default = ['2026-10-31T12:00:00.000000+00:00', '2026-12-24T10:00:00.000000+00:00'];
+        $normalizer = new ContextNormalizer(dateFormat: 'd.m.Y');
+        $redacting = new ContextNormalizer(redactKeys: ['password']);
+        return [
+            'default' => [new JsonFormatter(), ...$default],
+            'the formatter\'s' => [new JsonFormatter('Y-m-d'), '2026-10-31', '2026-12-24'],
+            'the normalizer\'s' => [new JsonFormatter(normalizer: $normalizer), '31.10.2026', '24.12.2026'],
+            'the formatter\'s over the normalizer\'s' => [
+                new JsonFormatter('Y-m-d', $redacting),
+                '2026-10-31',
+                '2026-12-24',
+            ],
+        ];
     }
 
-    public function testInvalidUtf8FallsBack(): void
+    private function record(array $context, string $message = 'Original'): LogRecord
     {
-        $json = (new JsonFormatter())->format('error', 'bad', ['payload' => "\xB1\x31"], $this->time);
-
-        $this->assertNotSame('', $json);
-        $decoded = json_decode($json, true);
-        $this->assertIsArray($decoded);
-        $this->assertSame('error', $decoded['level'] ?? null);
+        return new LogRecord('error', $message, $context, new \DateTimeImmutable('2026-10-31T12:00:00+00:00'));
     }
 }
